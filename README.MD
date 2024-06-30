@@ -39,6 +39,7 @@ If the Swiftbet website undergoes significant design changes, these scripts will
 A key step in the next stage of development is handling `StaleElement` exceptions.
 These rarely occur currently. If they do, you'll need to rerun the script and it will run successfully.
 Unfortunately, I ran out of time to redesign the script to handle them but will resolve this in the next version.
+The solution I have in mind is replacing `time.sleep()` with explicit waits to ensure the element is available for interaction.
 
 **HAPPY WEBSCRAPING**
 
