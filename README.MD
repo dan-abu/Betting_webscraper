@@ -36,6 +36,10 @@ Given that these are Australian markets, I recommend running these scripts first
 
 If the Swiftbet website undergoes significant design changes, these scripts will need to be updated, so please keep this in mind.
 
+A key step in the next stage of development is handling `StaleElement` exceptions.
+These rarely occur currently. If they do, you'll need to rerun the script and it will run successfully.
+Unfortunately, I ran out of time to redesign the script to handle them but will resolve this in the next version.
+
 **HAPPY WEBSCRAPING**
 
 
