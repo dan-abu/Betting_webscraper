@@ -7,185 +7,226 @@ import sys
 import time
 import pandas as pd
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from datetime import datetime as dt
 from datetime import timedelta
 
+class Bookie_Data():
+    """Creating class for bookie data"""
+    def __init__(self, url: str, scrape_time: str, xpaths_file: str) -> None:
+        """Initialising bookie class"""
+        self.url = url
+        self.df = None
+        self._table_count = 0
+        self._track_names = []
+        self._race_names = {}
+        self._race_data = []
+        self._file_creation_time = None
+        self._scrape_time = scrape_time
+        self.xpaths_file = xpaths_file
+        self.tomorrows_races_xpath = None
+        self._all_race_tables_xpath = None
+        self._race_table_xpath = None
+        self._race_table_row_xpath = None
+        self._race_table_cell_xpath = None
+        self._race_table_track_name_xpath = None
+        self._race_table_row_track_name_xpath = None
+        self._race_category_xpath = None
+        self._race_category_columns_xpath = None
+        self._race_category_headers_xpath = None
 
-def parseTimeString(timeStr: str) -> int:
-    """Converts time string into integer (seconds)"""
-    totalSeconds = 0
-    parts = re.findall(r"(-?\d+)([dhms])", timeStr)
-    for value, unit in parts:
-        value = int(value)
-        if unit == "d":
-            totalSeconds += value * 86400
-        elif unit == "h":
-            totalSeconds += value * 3600
-        elif unit == "m":
-            totalSeconds += value * 60
-        elif unit == "s":
-            totalSeconds += value
-    return totalSeconds
+    def load_xpaths(self) -> None:
+        """Reads xpaths file and sets xpath variables"""
+        with open(self.xpaths_file, 'r') as file:
+            lines = file.readlines()
 
+        self.tomorrows_races_xpath = lines[0]
+        self._all_race_tables_xpath = lines[1]
+        self._race_table_xpath = lines[2]
+        self._race_table_row_xpath = lines[3]
+        self._race_table_cell_xpath = lines[4]
+        self._race_table_cell_links_xpath = lines[5]
+        self._race_table_cell_link_xpath = lines[6]
+        self._race_table_track_name_xpath = lines[7]
+        self._race_table_row_track_name_xpath = lines[8]
+        self._race_category_xpath = lines[9]
+        self._race_category_columns_xpath = lines[10]
+        self._race_category_headers_xpath = lines[11]
 
-def calculateRaceTime(timeLeft: int) -> str:
-    """Returns actual race time in format"""
-    secondsLeft = parseTimeString(timeLeft)
-    now = dt.now()
-    raceTime = now + timedelta(seconds=secondsLeft)
-    return raceTime.strftime("%H:%M:%S %Y-%m-%d")
+    @staticmethod
+    def parse_time_string(time_str: str) -> int:
+        """Converts time string into integer (seconds)"""
+        total_seconds = 0
+        parts = re.findall(r"(-?\d+)([dhms])", time_str)
+        for value, unit in parts:
+            value = int(value)
+            if unit == "d":
+                total_seconds += value * 86400
+            elif unit == "h":
+                total_seconds += value * 3600
+            elif unit == "m":
+                total_seconds += value * 60
+            elif unit == "s":
+                total_seconds += value
+        return total_seconds
 
+    def calculate_race_time(self, time_left: int) -> str:
+        """Returns actual race time in format"""
+        seconds_left = self.parse_time_string(time_left)
+        now = dt.now()
+        race_time = now + timedelta(seconds=seconds_left)
+        return race_time.strftime("%H:%M:%S %Y-%m-%d")
 
-def getElementCount(xpath='//*[@id="main-content-page"]/div[2]/div[4]/div/*') -> int:
-    """Get number of elements in part of webpage"""
-    return len(driver.find_elements(By.XPATH, xpath))
+    @staticmethod
+    def get_element_count(xpath:str) -> None:
+        """Get number of elements in part of webpage"""
+        return len(driver.find_elements(By.XPATH, xpath))
 
-
-def getAllCellValues(tableCount: int) -> dict:
-    """Get race times and race links"""
-    allCellValues = []
-    for i in range(1, tableCount + 1):
-        rowCount = len(
-            driver.find_elements(
-                By.XPATH,
-                f'//*[@id="main-content-page"]/div[2]/div[4]/div/div[{i}]/div[2]/div/div/div/div/div[2]/*',
-            )
-        )
-        for j in range(1, rowCount + 1):
-            rowCellValues = []
-            cellsCount = len(
+    def get_all_cell_values(self) -> None:
+        """Get race times and race links"""
+        for i in range(1, self._table_count):
+            row_count = len(
                 driver.find_elements(
                     By.XPATH,
-                    f'//*[@id="main-content-page"]/div[2]/div[4]/div/div[{i}]/div[2]/div/div/div/div/div[2]/div[{j}]/*',
+                    self._race_table_xpath.format(i=i),
                 )
             )
-            for k in range(1, cellsCount + 1):
-                cellText = driver.find_element(
-                    By.XPATH,
-                    f'//*[@id="main-content-page"]/div[2]/div[4]/div/div[{i}]/div[2]/div/div/div/div/div[2]/div[{j}]/div[{k}]',
-                )
-                if cellText.text:
-                    if cellText.text == "CLOSED":
-                        rowCellValues.append("")
-                    elif cellText.text == "ABANDONED":
-                        rowCellValues.append("")
-                    elif "/" in cellText.text:
-                        rowCellValues.append("")
-                    else:
-                        raceTime = calculateRaceTime(cellText.text)
-                        rowCellValues.append(raceTime)
-                else:
-                    rowCellValues.append("")
-                cellLinkCount = len(
+            for j in range(1, row_count + 1):
+                row_cell_values = []
+                cell_count = len(
                     driver.find_elements(
                         By.XPATH,
-                        f'//*[@id="main-content-page"]/div[2]/div[4]/div/div[{i}]/div[2]/div/div/div/div/div[2]/div[{j}]/div[{k}]/*',
+                        self._race_table_row_xpath.format(i=i, j=j),
                     )
                 )
-                if cellLinkCount > 0:
-                    cellLink = driver.find_element(
+                for k in range(1, cell_count + 1):
+                    cell_text = driver.find_element(
                         By.XPATH,
-                        f'//*[@id="main-content-page"]/div[2]/div[4]/div/div[{i}]/div[2]/div/div/div/div/div[2]/div[{j}]/div[{k}]/a',
+                        self._race_table_cell_xpath.format(i=i, j=j, k=k),
                     )
-                    rowCellValues.append(cellLink.get_attribute("href"))
-                else:
-                    rowCellValues.append("")
+                    if cell_text.text:
+                        if cell_text.text == "CLOSED":
+                            row_cell_values.append("")
+                        elif cell_text.text == "ABANDONED":
+                            row_cell_values.append("")
+                        elif "/" in cell_text.text:
+                            row_cell_values.append("")
+                        else:
+                            race_time = self.calculate_race_time(cell_text.text)
+                            row_cell_values.append(race_time)
+                    else:
+                        row_cell_values.append("")
+                    cell_link_count = len(
+                        driver.find_elements(
+                            By.XPATH,
+                            self._race_table_cell_links_xpath.format(i=i, j=j, k=k),
+                        )
+                    )
+                    if cell_link_count > 0:
+                        cellLink = driver.find_element(
+                            By.XPATH,
+                            self._race_table_cell_link_xpath.format(i=i, j=j, k=k),
+                        )
+                        row_cell_values.append(cellLink.get_attribute("href"))
+                    else:
+                        row_cell_values.append("")
 
-            allCellValues.append(rowCellValues)
-            continue
+                self._race_data.append(row_cell_values)
 
-    return allCellValues
-
-
-def getTrackNames(tableCount: int) -> list:
-    """Gets track names"""
-    trackNames = []
-    for i in range(1, tableCount + 1):
-        rowCount = len(
-            driver.find_elements(
-                By.XPATH,
-                f'//*[@id="main-content-page"]/div[2]/div[4]/div/div[{i}]/div[1]/div/div[2]/div/*',
+    def get_track_names(self) -> None:
+        """Gets track names"""
+        for i in range(1, self._table_count):
+            row_count = len(
+                driver.find_elements(
+                    By.XPATH,
+                    self._race_table_track_name_xpath.format(i=i),
+                )
             )
-        )
-        for j in range(1, rowCount + 1):
-            trackName = driver.find_element(
+            for j in range(1, row_count + 1):
+                track_name = driver.find_element(
+                    By.XPATH,
+                    self._race_table_row_track_name_xpath.format(i=i, j=j),
+                )
+                self._track_names.append(track_name.text)
+
+    def get_race_names(self) -> None:
+        """Get race names"""
+        for i in range(1, self._table_count):
+            table_race_names = []
+            race_category = driver.find_element(
                 By.XPATH,
-                f'//*[@id="main-content-page"]/div[2]/div[4]/div/div[{i}]/div[1]/div/div[2]/div/div[{j}]/div/a',
+                self._race_category_xpath.format(i=i),
             )
-            trackNames.append(trackName.text)
-
-    return trackNames
-
-
-def getRaceName(tableCount: int) -> dict:
-    """Get race names"""
-    raceNames = {}
-    for i in range(1, tableCount + 1):
-        tableRaceNames = []
-        raceCategory = driver.find_element(
-            By.XPATH,
-            f'//*[@id="main-content-page"]/div[2]/div[4]/div/div[{i}]/div[1]/div/div[1]/span[1]',
-        )
-        columnCount = len(
-            driver.find_elements(
-                By.XPATH,
-                f'//*[@id="main-content-page"]/div[2]/div[4]/div/div[{i}]/div[2]/div/div/div/div/div[1]/span/div/*',
+            column_count = len(
+                driver.find_elements(
+                    By.XPATH,
+                    self._race_category_columns_xpath.format(i=i),
+                )
             )
-        )
-        for j in range(1, columnCount + 1):
-            raceName = driver.find_element(
-                By.XPATH,
-                f'//*[@id="main-content-page"]/div[2]/div[4]/div/div[{i}]/div[2]/div/div/div/div/div[1]/span/div/div[{j}]',
-            )
-            tableRaceNames.append(raceName.text)
-        raceNames[raceCategory.text] = tableRaceNames
+            for j in range(1, column_count + 1):
+                race_name = driver.find_element(
+                    By.XPATH,
+                    self._race_category_headers_xpath.format(i=i, j=j),
+                )
+                table_race_names.append(race_name.text)
+            self._race_names[race_category.text] = table_race_names
 
-    return raceNames
+    def create_df(self) -> None:
+        """Creates DataFrame from scraped data"""
+        cols = max([value for value in self._race_names.values()], key=len)
+        race_info = ["Time", "Link"]
+        new_cols = pd.MultiIndex.from_product([cols, race_info])
+        self.df = pd.DataFrame(data=self._race_data, index=self._track_names, columns=new_cols)
 
+def scrape(bookies: Bookie_Data) -> None:
+    """Scrapes web data"""
+    bookies._table_count = bookies.get_element_count(xpath=bookies._all_race_tables_xpath) + 1 #counting number of tables (i.e. race categories), add one because of future use of range(1, bookies._table_count)
+    bookies.get_track_names()
+    bookies.get_race_names()
+    bookies.get_all_cell_values()
 
-def createDF(raceNames: dict, raceData: list, trackNames: list) -> pd.DataFrame:
-    """Creates DataFrame from scraped data"""
-    cols = max([value for value in raceNames.values()], key=len)
-    raceInfo = ["Time", "Link"]
-    newCols = pd.MultiIndex.from_product([cols, raceInfo])
-    df = pd.DataFrame(data=raceData, index=trackNames, columns=newCols)
-
-    return df
-
-
-if __name__ == "__main__":
+def main() -> None:
+    """Entry point to programme"""
+    global driver, day_check
     driver = webdriver.Chrome()
-    URL = "https://www.swiftbet.com.au/racing"
-    driver.get(URL)
-    dayCheck = sys.argv[1]
-
+    url = sys.argv[1]
+    day_check = sys.argv[2]
+    scrape_time = dt.now()
+    xpaths_file = sys.argv[3]
+    bookies = Bookie_Data(url=url, xpaths_file=xpaths_file, scrape_time=scrape_time)
+    bookies.load_xpaths()
+    
+    driver.get(url)
     time.sleep(20)
 
-    if dayCheck == "tomorrow":
+    if day_check == "tomorrow":
         # Getting tomorrow's data
         driver.find_element(
             By.XPATH,
-            '//*[@id="main-content-page"]/div[2]/div[2]/div/div[2]/div/button[5]',
+            bookies.tomorrows_races_xpath,
         ).click()
         time.sleep(20)
 
-    RaceTableCount = getElementCount()
-    TrackNames = getTrackNames(tableCount=RaceTableCount)
-    RaceNames = getRaceName(tableCount=RaceTableCount)
-    RaceData = getAllCellValues(tableCount=RaceTableCount)
-    fileCreationTime = dt.now().strftime("%Y-%m-%d_%H%M%S")
-    df_races_data = createDF(
-        raceNames=RaceNames, raceData=RaceData, trackNames=TrackNames
-    )
+    try:
+        scrape(bookies=bookies)
+    except NoSuchElementException as e:
+        print(e)
+        scrape(bookies=bookies)
 
-    if dayCheck == "tomorrow":
-        df_races_data.to_csv(
-            f"data/tomorrow_races_data{fileCreationTime}.csv", header=True, index=True
+    bookies._file_creation_time = dt.now().strftime("%Y-%m-%d_%H%M%S")
+    bookies.create_df()
+
+    if day_check == "tomorrow":
+        bookies.df.to_csv(
+            f"data/tomorrow_races_data{bookies._file_creation_time}.csv", header=True, index=True
         )
     else:
-        df_races_data.to_csv(
-            f"data/today_races_data{fileCreationTime}.csv", header=True, index=True
+        bookies.df.to_csv(
+            f"data/today_races_data{bookies._file_creation_time}.csv", header=True, index=True
         )
 
     driver.quit()
+
+if __name__ == "__main__":
+    main()
