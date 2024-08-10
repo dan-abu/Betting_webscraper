@@ -20,9 +20,9 @@ Here are some example commands.
 
 For `data_scraper.py`:
 
-- `python3 ./src/data_scraper.py today`
+- `python3 ./src/data_scraper.py https://www.swiftbet.com.au/racing today ./assets/xpaths.txt`
 
-- `python3 ./src/data_scraper.py tomorrow`
+- `python3 ./src/data_scraper.py https://www.swiftbet.com.au/racing tomorrow ./assets/xpaths.txt`
 
 For `bot.py`:
 
