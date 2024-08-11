@@ -39,17 +39,17 @@ class Race_Scraper():
 
     async def set_xpaths(self) -> None:
         """Sets xpath variables"""
-        self.headers_xpaths = lines[0]
-        self.index_xpaths = lines[1]
-        self.race_column_xpaths = lines[2]
-        self.race_cell_xpaths = lines[3]
-        self.race_header_xpaths1 = lines[4]
-        self.race_header_xpaths2 = lines[5]
-        self.tomorrows_xpath = lines[6]
-        self.click_race_xpath = lines[7]
-        self.number_race_xpath1 = lines[8]
-        self.number_race_xpath2 = lines[9]
-        self.race_row_xpaths = lines[10]
+        self.headers_xpaths = lines2[0]
+        self.index_xpaths = lines2[1]
+        self.race_column_xpaths = lines2[2]
+        self.race_cell_xpaths = lines2[3]
+        self.race_header_xpaths1 = lines2[4]
+        self.race_header_xpaths2 = lines2[5]
+        self.tomorrows_xpath = lines2[6]
+        self.click_race_xpath = lines2[7]
+        self.number_race_xpath1 = lines2[8]
+        self.number_race_xpath2 = lines2[9]
+        self.race_row_xpaths = lines2[10]
 
     async def csv_to_df(self) -> None:
         """Turn given CSV into DF"""
@@ -160,27 +160,36 @@ async def scrape(web_scraper: Race_Scraper, page) -> None:
     await web_scraper.get_index(page)
     await web_scraper.get_prices(page)
 
-def clean_data(val: str) -> None:
-    """Cleans web scraped data"""
-    if ' FAV' in val:
-        val = val.removesuffix(' FAV')
-        return val
-    elif (val == 'FIXED') | (val == 'FIXED FAV') | (val == 'SP') | (val == 'SP FAV') | (val == 'MID') | (val=='MID FAV'):
-        val = ''
-        return val
+async def get_most_recent_file(directory, max_retries=5, delay=1):
+    for attempt in range(max_retries):
+        # Get all files in the directory
+        files = [os.path.join(directory, f) for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+        
+        if files:
+            # Get the most recent file
+            most_recent_file = max(files, key=os.path.getctime)
+            return most_recent_file
+        
+        if attempt < max_retries - 1:
+            print(f"Attempt {attempt + 1} failed. Retrying in {delay} seconds...")
+            await asyncio.sleep(delay)
     
-async def main() -> None:
+    print(f"Failed to find a file after {max_retries} attempts.")
+    return None
+    
+async def main(csv_dir: str, day_check: str, xpaths_file: str, url: str) -> None:
     """Programme entry point"""
-    global lines
+    global lines2
     start_time = dt.now()
-    csv = sys.argv[1]
-    day_check = sys.argv[2]
-    xpaths_file = sys.argv[3]
-    url = sys.argv[4]
+    csv_dir = csv_dir
+    csv = await get_most_recent_file(directory=csv_dir)
+    day_check = day_check
+    xpaths_file = xpaths_file
+    url = url
 
     race_scraper = Race_Scraper(csv=csv, xpaths_file=xpaths_file)
 
-    lines = await scraper.Bookie_Data.load_xpaths(xpaths_file=xpaths_file)
+    lines2 = await scraper.Bookie_Data.load_xpaths(xpaths_file=xpaths_file)
 
     await load_random_race(race_scraper)
 

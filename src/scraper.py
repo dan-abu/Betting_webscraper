@@ -168,17 +168,17 @@ async def scrape(bookies: Bookie_Data, page) -> None:
     await bookies.get_race_names(page=page)
     await bookies.get_all_cell_values(page=page)
 
-async def main() -> None:
+async def main(url: str, day_check: str, xpaths_file: str) -> None:
     async with async_playwright() as p:
         global lines
         start_time = dt.now()
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
-        url = sys.argv[1]
-        day_check = sys.argv[2]
+        url = url
+        day_check = day_check
         scrape_time = dt.now()
-        xpaths_file = sys.argv[3]
+        xpaths_file = xpaths_file
         bookies = Bookie_Data(url=url, xpaths_file=xpaths_file, scrape_time=scrape_time)
         lines = await bookies.load_xpaths(xpaths_file=xpaths_file)
         await bookies.set_xpaths()

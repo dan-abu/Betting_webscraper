@@ -30,6 +30,10 @@ For `bot.py`:
 python3 ./src/old_test.py data/today_races_data2024-08-11_092308.csv today
 python3 ./src/test.py data/today_races_data2024-08-11_092308.csv today assets/bot_xpaths.txt https://www.swiftbet.com.au/racing
 
+python3 ./src/new_main.py https://www.swiftbet.com.au/racing today assets/scraper_xpaths.txt assets/bot_xpaths.txt data/today/all_races
+
+python3 ./src/another_main.py https://www.swiftbet.com.au/racing today assets/scraper_xpaths.txt assets/bot_xpaths.txt data/today/all_races
+
 - `python3 ./src/bot.py data/tomorrow_races_data2024-06-30_170458.csv tomorrow`
 
 ## Considerations
