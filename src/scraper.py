@@ -12,7 +12,6 @@ import asyncio
 import aiofiles
 from playwright.async_api import async_playwright
 
-
 class Bookie_Data():
     """Creating class for bookie data"""
     def __init__(self, url: str, scrape_time: str, xpaths_file: str) -> None:
@@ -37,10 +36,14 @@ class Bookie_Data():
         self._race_category_columns_xpath = None
         self._race_category_headers_xpath = None
 
-    async def load_xpaths(self) -> None:
-        async with aiofiles.open(self.xpaths_file, 'r') as file:
+    @staticmethod
+    async def load_xpaths(xpaths_file: str) -> None:
+        async with aiofiles.open(xpaths_file, 'r') as file:
             lines = await file.readlines()
-        
+        return lines
+    
+    async def set_xpaths(self) -> None:
+        """Sets xpath variables"""
         self.tomorrows_races_xpath = lines[0]
         self._all_race_tables_xpath = lines[1]
         self._race_table_xpath = lines[2]
@@ -167,6 +170,7 @@ async def scrape(bookies: Bookie_Data, page) -> None:
 
 async def main() -> None:
     async with async_playwright() as p:
+        global lines
         start_time = dt.now()
         browser = await p.chromium.launch()
         page = await browser.new_page()
@@ -176,7 +180,8 @@ async def main() -> None:
         scrape_time = dt.now()
         xpaths_file = sys.argv[3]
         bookies = Bookie_Data(url=url, xpaths_file=xpaths_file, scrape_time=scrape_time)
-        await bookies.load_xpaths()
+        lines = await bookies.load_xpaths(xpaths_file=xpaths_file)
+        await bookies.set_xpaths()
 
         await page.goto(url)
         await asyncio.sleep(20)
@@ -200,10 +205,10 @@ async def main() -> None:
         bookies.create_df()
 
         if day_check == "tomorrow":
-            async with aiofiles.open(f"data/tomorrow_races_data{bookies._file_creation_time}.csv", mode='w') as f:
+            async with aiofiles.open(f"data/tomorrow/all_races/tomorrow_races_data{bookies._file_creation_time}.csv", mode='w') as f:
                 await f.write(bookies.df.to_csv(header=True, index=True))
         else:
-            async with aiofiles.open(f"data/today_races_data{bookies._file_creation_time}.csv", mode='w') as f:
+            async with aiofiles.open(f"data/today/all_races/today_races_data{bookies._file_creation_time}.csv", mode='w') as f:
                 await f.write(bookies.df.to_csv(header=True, index=True))
 
         await browser.close()

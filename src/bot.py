@@ -2,211 +2,227 @@
 Scrapes current market prices for horses participating in
 a selected race
 """
-
 import sys
 import time
 import random
 import os
+import asyncio
 import pandas as pd
-from selenium import webdriver
-from selenium.webdriver.common.by import By
 from datetime import datetime as dt
+from playwright.async_api import async_playwright
+import scraper
 
+class Race_Scraper():
+    """Class for scraping prices for a particular race"""
+    def __init__(self, csv: str, xpaths_file: str) -> None:
+        """Initialising scraper"""
+        self.csv = csv
+        self.xpaths_file = xpaths_file
+        self.races = None
+        self.random_race = None
+        self.random_race_name = None
+        self.headers = []
+        self.indexes = []
+        self.prices = []
+        self.race_headers_count = 0
+        self.race_row_count = 0
+        self.race_column_count = 0
+        self.prices_df = None
+        self.headers_xpaths = None
+        self.index_xpaths = None
+        self.race_column_xpaths = None
+        self.race_cell_xpaths = None
+        self.race_header_xpaths1 = None
+        self.race_header_xpaths2 = None
+        self.tomorrows_xpath = None
+        self.race_row_xpaths = None
 
-def csvToDF(csv: str) -> pd.DataFrame:
-    """Turn given CSV into DF"""
-    races = pd.read_csv(csv, header=[0, 1], index_col=[0])
-    return races
+    async def set_xpaths(self) -> None:
+        """Sets xpath variables"""
+        self.headers_xpaths = lines[0]
+        self.index_xpaths = lines[1]
+        self.race_column_xpaths = lines[2]
+        self.race_cell_xpaths = lines[3]
+        self.race_header_xpaths1 = lines[4]
+        self.race_header_xpaths2 = lines[5]
+        self.tomorrows_xpath = lines[6]
+        self.click_race_xpath = lines[7]
+        self.number_race_xpath1 = lines[8]
+        self.number_race_xpath2 = lines[9]
+        self.race_row_xpaths = lines[10]
 
+    async def csv_to_df(self) -> None:
+        """Turn given CSV into DF"""
+        self.races = pd.read_csv(self.csv, header=[0, 1], index_col=[0])
 
-def getRandomRace(df: pd.DataFrame) -> pd.DataFrame:
-    """Randomly select race from csv"""
-    raceInfo = ["Time", "Link"]
-    placeholder = ["Placeholder"]
-    randomRace = pd.DataFrame(
-        index=["Placeholder"],
-        columns=pd.MultiIndex.from_product([placeholder, raceInfo]),
-    )
-
-    randomTrack = df.sample(n=1, axis=0)
-    trackName = randomTrack.index[0]
-
-    ogCols = list(randomTrack.columns)
-    newCols = []
-    for col in ogCols:
-        newCols.append(col[0])
-    newCols = set(newCols)
-    newCols = list(newCols)
-
-    nameRandomRace = random.choice(newCols)
-    dfNameRandomRace = [nameRandomRace]
-    randomRace.index = randomTrack.index
-    newCol = pd.MultiIndex.from_product([dfNameRandomRace, raceInfo])
-    randomRace.columns = newCol
-
-    randomRace.loc[trackName, (nameRandomRace, "Time")] = randomTrack.loc[
-        trackName, (nameRandomRace, "Time")
-    ]
-    randomRace.loc[trackName, (nameRandomRace, "Link")] = randomTrack.loc[
-        trackName, (nameRandomRace, "Link")
-    ]
-
-    return randomRace
-
-
-def getRandomRaceWithTimeout(df: pd.DataFrame, timeout: int = 60) -> pd.DataFrame:
-    """Calling getRandomRace with a timeout"""
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        race = getRandomRace(df)
-        if not pd.isna(race.iloc[0, 0]):
-            return race
-    raise TimeoutError(
-        "Function getRandomRace did not complete within 1 minute.\nIt appears there are no more races today.\nDouble-check the CSV file."
-    )
-
-
-def getHeaders(
-    xpath='//*[@id="main-content-page"]/div[2]/div[3]/div/div[1]/div/div/div[2]/div[2]/div[2]/div/div[3]/div[6]/div[1]',
-):
-    """Get market price headers"""
-    headers = driver.find_element(By.XPATH, xpath)
-    headers = headers.text
-    headers = headers.split("\n")
-    return headers
-
-
-def getIndex(rowCount: int) -> list:
-    """Get market price Index"""
-    indexes = []
-    for i in range(1, rowCount + 1, 2):
-        index = driver.find_element(
-            By.XPATH,
-            f'//*[@id="main-content-page"]/div[2]/div[3]/div/div[1]/div/div/div[2]/div[2]/div[2]/div/div[3]/div[6]/ul/li[{i}]/div[1]/div[1]/div/div[2]/div[1]',
+    async def get_random_race(self) -> None:
+        """Randomly select race from csv"""
+        race_info = ["Time", "Link"]
+        place_holder = ["Placeholder"]
+        self.random_race = pd.DataFrame(
+            index=["Placeholder"],
+            columns=pd.MultiIndex.from_product([place_holder, race_info]),
         )
-        indexes.append(index.text)
 
-    return indexes
+        random_track = self.races.sample(n=1, axis=0)
+        track_name = random_track.index[0]
 
+        og_cols = list(random_track.columns)
+        new_cols = []
+        for col in og_cols:
+            new_cols.append(col[0])
+        new_cols = set(new_cols)
+        new_cols = list(new_cols)
 
-def getPrices(rowCount: int) -> list:
-    """Get market prices"""
-    prices = []
-    columnCount = len(
-        driver.find_elements(
-            By.XPATH,
-            f'//*[@id="main-content-page"]/div[2]/div[3]/div[2]/div[1]/div/div/div[2]/div[2]/div[2]/div/div[3]/div[6]/div[1]/*',
+        name_random_race = random.choice(new_cols)
+        df_name_random_race = [name_random_race]
+        self.random_race.index = random_track.index
+        new_col = pd.MultiIndex.from_product([df_name_random_race, race_info])
+        self.random_race.columns = new_col
+
+        self.random_race.loc[track_name, (name_random_race, "Time")] = random_track.loc[
+            track_name, (name_random_race, "Time")
+        ]
+        self.random_race.loc[track_name, (name_random_race, "Link")] = random_track.loc[
+            track_name, (name_random_race, "Link")
+        ]
+
+        self.random_race_name = self.random_race.index[0]
+
+    async def get_random_race_with_timeout(self, timeout: int=60) -> pd.DataFrame:
+        """Calling getRandomRace with a timeout"""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            await self.get_random_race()
+            if not pd.isna(self.random_race.iloc[0, 0]):
+                return
+        raise TimeoutError(
+            "Function get_random_race did not complete within 1 minute.\nIt appears there are no more races today.\nDouble-check the CSV file."
         )
-    )
-    for i in range(1, rowCount + 1, 2):
-        rowPrices = []
-        for j in range(2, columnCount + 1):
-            columnPrice = driver.find_element(
-                By.XPATH,
-                f'//*[@id="main-content-page"]/div[2]/div[3]/div/div[1]/div/div/div[2]/div[2]/div[2]/div/div[3]/div[6]/ul/li[{i}]/div[1]/div[{j}]',
-            )
-            if "\nFAV" in columnPrice.text:
-                price = columnPrice.text
-                rowPrices.append(price.removesuffix("\nFAV"))
-            else:
-                rowPrices.append(columnPrice.text)
-        prices.append(rowPrices)
 
-    return prices
+    async def get_headers(self, page) -> None:
+        """Get market price headers"""
+        headers_element = await page.query_selector(self.headers_xpaths)
+        self.headers = await headers_element.text_content()
+        self.headers = self.headers.split(")")
+        del self.headers[-1]
 
+    async def get_index(self, page) -> None:
+        """Get market price Index"""
+        for i in range(1, self.race_row_count, 2):
+            index_element = await page.query_selector(self.index_xpaths.format(i=i))
+            self.indexes.append(await index_element.text_content())
 
-def getRaceHeaderCount() -> int:
-    """Returns number of races for a given track"""
-    try:
-        raceHeaderCount = len(
-            driver.find_elements(
-                By.XPATH,
-                f'//*[@id="main-content-page"]/div[2]/div[3]/div[2]/div[1]/div/div/div[2]/div[1]/div/div[2]/*',
-            )
-        )
-    except Exception as e:
-        print(e)
+    async def get_prices(self, page) -> None:
+        """Get market prices"""
+        self.race_column_count = await scraper.Bookie_Data.get_element_count(page=page, xpath=self.race_column_xpaths) + 1
+        for i in range(1, self.race_row_count, 2):
+            row_prices = []
+            for j in range(2, self.race_column_count):
+                column_price_element = await page.query_selector(self.race_cell_xpaths.format(i=i, j=j))
+                column_price_text = await column_price_element.text_content()
+                row_prices.append(column_price_text)
+            self.prices.append(row_prices)
+
+    async def get_race_header_count(self, page) -> None:
+        """Returns number of races for a given track"""
+        try:
+            self.race_headers_count = await scraper.Bookie_Data.get_element_count(page=page, xpath=self.race_header_xpaths1)
+        except Exception as e:
+            print(e)
+            try:
+                self.race_headers_count = await scraper.Bookie_Data.get_element_count(page=page, xpath=self.race_header_xpaths2)
+            except Exception as e:
+                print(e)
+                raise e
+
+async def load_random_race(web_scraper: Race_Scraper) -> None:
+    """Handles loading random race"""
+    await web_scraper.set_xpaths()
+    await web_scraper.csv_to_df()
+    await web_scraper.get_random_race_with_timeout()
+
+async def scrape(web_scraper: Race_Scraper, page) -> None:
+    """Scrapes web data"""
+    number_race_name = web_scraper.random_race.columns[0][0][5:]
+    await web_scraper.get_race_header_count(page)
+
+    if web_scraper.race_headers_count >= 8:
+        await page.click(web_scraper.number_race_xpath1.format(number_race_name=number_race_name))
     else:
-        return raceHeaderCount
+        await page.click(web_scraper.number_race_xpath2.format(number_race_name=number_race_name))
 
-    try:
-        raceHeaderCount = len(
-            driver.find_elements(
-                By.XPATH,
-                f'//*[@id="main-content-page"]/div[2]/div[3]/div[2]/div[1]/div/div/div[2]/div[1]/div/*',
-            )
-        )
-    except Exception as e:
-        print(e)
-        raise e
-    else:
-        return raceHeaderCount
+    await page.wait_for_timeout(20000)
 
+    web_scraper.race_row_count = await scraper.Bookie_Data.get_element_count(page=page, xpath=web_scraper.race_row_xpaths) + 1
+
+    await web_scraper.get_headers(page)
+    await web_scraper.get_index(page)
+    await web_scraper.get_prices(page)
+
+def clean_data(val: str) -> None:
+    """Cleans web scraped data"""
+    if ' FAV' in val:
+        val = val.removesuffix(' FAV')
+        return val
+    elif (val == 'FIXED') | (val == 'FIXED FAV') | (val == 'SP') | (val == 'SP FAV') | (val == 'MID') | (val=='MID FAV'):
+        val = ''
+        return val
+    
+async def main() -> None:
+    """Programme entry point"""
+    global lines
+    start_time = dt.now()
+    csv = sys.argv[1]
+    day_check = sys.argv[2]
+    xpaths_file = sys.argv[3]
+    url = sys.argv[4]
+
+    race_scraper = Race_Scraper(csv=csv, xpaths_file=xpaths_file)
+
+    lines = await scraper.Bookie_Data.load_xpaths(xpaths_file=xpaths_file)
+
+    await load_random_race(race_scraper)
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        await page.goto(url)
+
+        await page.wait_for_timeout(10000)
+
+        race_scraper.race_row_count = await scraper.Bookie_Data.get_element_count(page=page, xpath=race_scraper.race_row_xpaths) + 1
+
+        if day_check == "tomorrow":
+            # Tomorrow's webpage
+            await page.click(race_scraper.tomorrows_xpath)
+            await page.wait_for_timeout(10000)
+    
+        await page.click(race_scraper.click_race_xpath.format(race_name=race_scraper.random_race_name))
+
+        await scrape(web_scraper=race_scraper, page=page)
+
+        file_creation_time = dt.now().strftime("%Y-%m-%d_%H%M%S")
+
+        bets = pd.DataFrame(data=race_scraper.prices, index=race_scraper.indexes, columns=race_scraper.headers)
+
+        if day_check == "tomorrow":
+            bets.to_csv("data/tomorrow/specific_races/staging_bets.csv")
+            df_performed_bets = pd.read_csv("data/tomorrow/specific_races/staging_bets.csv", header=0, index_col=0)
+            df_performed_bets.dropna(inplace=True)
+            df_performed_bets.to_csv(f"data/tomorrow/specific_races/tomorrow_{race_scraper.random_race_name}_{file_creation_time}.csv")
+            os.remove("data/tomorrow/specific_races/staging_bets.csv")
+        else:
+            bets.to_csv("data/today/specific_races/staging_bets.csv")
+            df_performed_bets = pd.read_csv("data/today/specific_races/staging_bets.csv", header=0, index_col=0)
+            df_performed_bets.dropna(inplace=True)
+            df_performed_bets.to_csv(f"data/today/specific_races/today_{race_scraper.random_race_name}_{file_creation_time}.csv")
+            os.remove("data/today/specific_races/staging_bets.csv")
+
+        await browser.close()
+        end_time = dt.now()
+        run_time = end_time - start_time
+        print(run_time)
 
 if __name__ == "__main__":
-    file = sys.argv[1]
-    dayCheck = sys.argv[2]
-    ogDF = csvToDF(csv=file)
-    race = getRandomRaceWithTimeout(df=ogDF)
-    raceName = race.index[0]
-
-    driver = webdriver.Chrome()
-    URL = "https://www.swiftbet.com.au/racing"
-    driver.get(URL)
-
-    time.sleep(10)
-
-    if dayCheck == "tomorrow":
-        # Tomorrow's webpage
-        driver.find_element(
-            By.XPATH,
-            '//*[@id="main-content-page"]/div[2]/div[2]/div/div[2]/div/button[5]',
-        ).click()
-        time.sleep(10)
-
-    driver.find_element(By.XPATH, f'//*[@title="{raceName}"]').click()
-
-    numberRaceName = race.columns[0][0][5:]
-
-    headerRaceCount = getRaceHeaderCount()
-
-    if headerRaceCount >= 8:
-        driver.find_element(
-            By.XPATH,
-            f'//*[@id="main-content-page"]/div[2]/div[3]/div[2]/div[1]/div/div/div[2]/div[1]/div/div[2]/span[{numberRaceName}]',
-        ).click()
-    else:
-        driver.find_element(
-            By.XPATH,
-            f'//*[@id="main-content-page"]/div[2]/div[3]/div[2]/div[1]/div/div/div[2]/div[1]/div/div[{numberRaceName}]',
-        ).click()
-
-    time.sleep(20)
-
-    rowCount = len(
-        driver.find_elements(
-            By.XPATH,
-            '//*[@id="main-content-page"]/div[2]/div[3]/div/div[1]/div/div/div[2]/div[2]/div[2]/div/div[3]/div[6]/ul/*',
-        )
-    )
-    headers = getHeaders()
-    index = getIndex(rowCount=rowCount)
-    prices = getPrices(rowCount=rowCount)
-
-    fileCreationTime = dt.now().strftime("%Y-%m-%d_%H%M%S")
-    bets = pd.DataFrame(data=prices, index=index, columns=headers)
-
-    if dayCheck == "tomorrow":
-        bets.to_csv("data/staging_bets.csv")
-        df_performed_bets = pd.read_csv("data/staging_bets.csv", header=0, index_col=0)
-        df_performed_bets.dropna(inplace=True)
-        df_performed_bets.to_csv(f"data/tomorrow_{raceName}_{fileCreationTime}.csv")
-        os.remove("data/staging_bets.csv")
-    else:
-        bets.to_csv("data/staging_bets.csv")
-        df_performed_bets = pd.read_csv("data/staging_bets.csv", header=0, index_col=0)
-        df_performed_bets.dropna(inplace=True)
-        df_performed_bets.to_csv(f"data/today{raceName}_{fileCreationTime}.csv")
-        os.remove("data/staging_bets.csv")
-
-    driver.quit()
+    asyncio.run(main())

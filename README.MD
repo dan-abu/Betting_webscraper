@@ -18,16 +18,17 @@ You will find other technical dependencies in `requirements.txt`.
 Use the CLI to run these scripts.
 Here are some example commands.
 
-For `data_scraper.py`:
+For `scraper.py`:
 
-- `python3 ./src/data_scraper.py https://www.swiftbet.com.au/racing today ./assets/xpaths.txt`
-python3 ./src/test.py https://www.swiftbet.com.au/racing today ./assets/xpaths.txt
+- `python3 ./src/scraper.py https://www.swiftbet.com.au/racing today ./assets/scraper_xpaths.txt`
 
 - `python3 ./src/data_scraper.py https://www.swiftbet.com.au/racing tomorrow ./assets/xpaths.txt`
 
 For `bot.py`:
 
 - `python3 ./src/bot.py data/today_races_data2024-06-30_170326.csv today`
+python3 ./src/old_test.py data/today_races_data2024-08-11_092308.csv today
+python3 ./src/test.py data/today_races_data2024-08-11_092308.csv today assets/bot_xpaths.txt https://www.swiftbet.com.au/racing
 
 - `python3 ./src/bot.py data/tomorrow_races_data2024-06-30_170458.csv tomorrow`
 
